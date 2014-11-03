@@ -1,0 +1,213 @@
+doctype html
+html
+  head
+    title Présentation Docker
+    script(type='text/javascript' src='/common/vendor.js')
+    link(rel='stylesheet', href='/common/vendor.css')
+    meta(name="apple-mobile-web-app-capable", content="yes")
+    meta(name="apple-mobile-web-app-status-bar-style", content="black-translucent")
+    meta(name="viewport", content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no")
+  body
+    .reveal
+
+      .slides
+        section
+          h1 Environnements sur mesure
+          h3 Avec Vagrant et Docker
+          p
+            small
+              | Par&nbsp;
+              a(href='#') Alexandre Rimthong
+
+        section
+          h2 Problème
+          p On veut des environnements faciles à reproduire et avoir la possibilité de prendre des snapshots. Utile pour:
+          ul
+            li Déployer nos solutions de façon modulaire, sans se soucier de la plateforme/environnement du client.
+            li Facilement faire des mise en prod et des rollbacks.
+            li Monter des environnements de test.
+            li Monter des environnements pour des formations.
+
+        section
+          h3 Labyrinthe de technos
+          ul
+            li Vagrant
+            li Docker
+            li Fig/Panamax/Flynn
+            li Hipache
+
+        section
+          section
+            h2 Vagrant
+            p Vagrant permet de créer des recettes de machines virtuelles, et de les déployer dans plusieurs environnements.
+          
+          section
+            h3 Example
+            p Une machine virtuelle avec ubuntu, déployée sur amazon
+            pre
+              code(data-trim, contenteditable)
+                | VAGRANTFILE_API_VERSION = "2"
+                | 
+                | Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+                |   config.vm.box = "aws-precise64"
+                | 
+                |   config.vm.provision :shell, :path => "bootstrap.sh"
+                | 
+                |   config.vm.provider :aws do |aws, override|
+                |     aws.access_key_id = "XXX"
+                |     aws.secret_access_key = "ZZZ"
+                |     aws.keypair_name = "vagrant-amazon"
+                |     aws.security_groups = [ 'vagrant' ]
+                | 
+                |     override.ssh.username = "ubuntu"
+                |     override.ssh.private_key_path = "~/vagrant-amazon.pem"
+                |   end
+                | end
+            p Par la suite, on a des commandes disponibles:
+            pre
+              code(data-trim, contenteditable)
+                | vagrant up
+                | vagrant ssh
+
+          section
+            h2 Cool!
+            h4 Pro
+            ul
+              li Répond à nos besoins de standardiser les environnements.
+              li Possible de faire des snapshots de VM.
+            h4 Con
+            ul
+              li Une machine virtuelle au complet, c'est un peu lourd.
+              li Ne répond pas aux besoins de modulariser.
+
+        section
+          section
+            h2 Docker
+            p Permet de monter des microenvironnements.
+
+          section
+            h3 Example 1
+            p Permet de monter des microenvironnements.
+            pre
+              code(data-trim, contenteditable)
+                |FROM google/nodejs
+                | 
+                |WORKDIR /app
+                |ADD src/sgmc/webapi/package.json /app/
+                |RUN npm install
+            
+            p Par la suite, on peut faire fonctionner notre docker:
+            pre
+              code(data-trim, contenteditable)
+                | docker run -p 3333:3333
+
+          section
+            h3 Example 2
+            p Même pas besoin de Dockerfile!
+            pre
+              code(data-trim, contenteditable)
+                | docker search jenkins
+                | docker pull jenkins
+                | docker run -d -p 80:80 jenkins:latest
+          
+          section
+            h2 Oh yeah!
+            h4 Pro
+            ul
+              li Modularisation! 
+              li Possible de garder l'état avec des tags!
+            h4 Con
+            ul
+              li Communication avec host / entre modules.
+              li Courbe d'aprentissage particulière.
+
+
+        section
+          section
+            h2 Orchestration!
+          section
+            h3 Fig
+            p Configuration facile de plusieurs docker.
+            pre
+              code(data-trim, contenteditable)
+                | db:
+                |   image: mongo
+                |   ports:
+                |     - "27017"
+                | 
+                | elastic:
+                |   image: barnybug/elasticsearch:0.90.9
+                |   ports:
+                |     - "9200"
+                |     - "9300"
+                | web:
+                |   build: ./sagemec/
+                |   command: node app
+                |   ports:
+                |     - "3333:3333"
+                |   links:
+                |     - db
+                |     - elastic
+                | 
+                | staging:
+                |   build: ./sagemec/
+                |   command: node app
+                |   ports:
+                |     - "4444:3333"
+                |   links:
+                |     - db
+                |     - elastic
+
+          section
+            h3 Hipache
+            p Routeur Web qui peut être configuré live avec redis.
+            pre
+              code(data-trim, contenteditable)
+                | redis 127.0.0.1:6379> rpush frontend:localhost "http://localhost:4444"
+                | redis 127.0.0.1:6379> lrange frontend:localhost 0 -1
+                | 1) "mywebsite"
+                | 2) "http://localhost:3333"
+                | 3) "http://localhost:4444"
+                | redis 127.0.0.1:6379> lrem frontend:localhost -1 "http://localhost:3333"
+      
+        section
+          section
+            h2 Solution combinée
+            ul
+              li On prépare un environnement stable avec Vagrant, qui supporte Docker.
+              li On sépare toutes les composantes dans des dockers orchestrés par Fig.
+              li On route avec hipache.
+          section
+            p Demo!
+
+        section
+          section
+            h2 Autres architectures interessantes
+          section
+            h2 Exemple 1: Sagemec as a service (SAAS/PAAS/multi-tenancy)
+             img(src='/images/docker/architecture1.png')
+          section
+            h2 Exemple 2: Outil de formation (preserving state)
+            img(src='/images/docker/architecture2.png')
+          section
+            h2 Exemple 3: Selenium Grid (testing)
+          section
+            h2 Exemple 4: Dev/Staging/Production on same server
+
+        section
+          h3 Prochaines étapes
+          p Faire un répo privé!
+
+    script.
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+
+        theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+        transition: Reveal.getQueryHash().transition || 'default'
+        });
+      hljs.initHighlightingOnLoad();
+
+
